@@ -24,11 +24,11 @@ PROPOSALS = [
                    "40% regulatory weight. These are relationship balances and the "
                    "internal 50% is punitive."),
     dict(id="P2", kind="deposit_runoff", name="retail_less_stable", proposed=0.12,
-         submitted_by="consumer banking",
+         submitted_by="consumer banking team",
          rationale="Less stable retail is insured money that rate-shops; realized outflow "
                    "in the 2025 event was about 11%. Lower the internal 13% to 12%."),
     dict(id="P3", kind="draw", name="corp_liquidity", proposed=0.30,
-         submitted_by="corporate lending",
+         submitted_by="corporate lending team",
          rationale="Liquidity facility draws peaked below 30% in 2025. The internal 35% "
                    "draw assumption over-reserves against the facility book."),
 ]

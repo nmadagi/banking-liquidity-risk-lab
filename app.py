@@ -174,7 +174,7 @@ with tab2:
         rules = alt.Chart(pd.DataFrame({"y": [surv_limit[1], surv_limit[2]], "kind": ["trigger", "limit"]})).mark_rule(
             strokeDash=[4, 4]).encode(y="y:Q", color=alt.Color("kind:N", title=None))
         chart(alt.layer(line, rules).properties(height=260, title="Survival horizon under the internal combined stress"))
-    st.write("**Notice the spring 2025 event.** LCR barely dipped while the survival horizon fell to its trigger, "
+    st.write("**Notice the spring 2025 event.** LCR barely dipped while the survival horizon fell from beyond 90 days to its trigger, "
              "because the fastest money to leave carries a 100% weight: every dollar of it that goes takes a dollar "
              "of HQLA and a dollar of assumed outflow with it, so the ratio hardly moves while the cash does. The "
              "ratio is a snapshot; the horizon is a cash flow. A second line watches both.")
