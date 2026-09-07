@@ -70,7 +70,7 @@ def candidates(seed=0):
     return {
         "persistence (last 30 days)": None,
         "ridge regression": Ridge(alpha=1.0),
-        "random forest": RandomForestRegressor(n_estimators=200, min_samples_leaf=20,
+        "random forest": RandomForestRegressor(n_estimators=80, min_samples_leaf=20,
                                                random_state=seed, n_jobs=1),
         "gradient boosting": HistGradientBoostingRegressor(max_iter=500, learning_rate=0.05,
                                                            max_leaf_nodes=31, min_samples_leaf=20,
@@ -152,7 +152,7 @@ def fit_final(panel, name="gradient boosting", seed=0):
     return model
 
 
-def importance(model, panel, seed=0, n_repeats=5) -> pd.DataFrame:
+def importance(model, panel, seed=0, n_repeats=3) -> pd.DataFrame:
     cols = feature_columns(panel)
     test = panel[panel.index >= SPLIT]
     r = permutation_importance(model, test[cols], test["target"], n_repeats=n_repeats,
