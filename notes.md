@@ -50,3 +50,15 @@ Floating point caught me: 0.10 * 1.10 * 100 is 11.000000000000002 and math.ceil 
 - Intraday view for the operational deposits.
 - A real stress index built from market data and the bank's own indicators.
 - More than one history for the model selection, so the fidelity score is not scored on the same episode it learned from.
+
+## trimmed to one table and at most one chart per tab
+
+Ten charts and tables is more than anyone absorbs in a twenty minute walk
+through. Tab 1 keeps the attribution table (the history chart went); tab 2
+keeps the status table and the survival horizon chart, with open breaches
+in one caption line (the LCR chart and the breach log table went, the log
+is still a function and a test); tab 3 keeps the projection chart and the
+reconciliation table, with the LCR and NSFR builds as one line of text; tab 4
+keeps the verdict table, the memos folded into expanders, and the one model
+table that carries the lesson. Fidelity selection and permutation importance
+stay in src/ml.py and the tests.

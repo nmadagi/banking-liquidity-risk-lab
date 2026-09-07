@@ -17,7 +17,7 @@ st.set_page_config(page_title="Banking Liquidity Risk Lab", layout="wide")
 
 # Streamlit hashes a cached function's own source, not what it calls. Bump this
 # string whenever the generator, metrics or models change.
-PIPELINE_VERSION = "2026-09-07-v2"
+PIPELINE_VERSION = "2026-09-07-v3-trimmed"
 
 SEGMENT_LABEL = {"retail_stable": "retail, stable (insured)", "retail_less_stable": "retail, less stable (insured)",
                  "small_business": "small business (insured)", "corp_operational": "corporate operational",
@@ -123,105 +123,65 @@ with tab1:
     )
     if window.startswith("Q2 2026"):
         st.write(
-            f"Deposits grew and the balance sheet looks healthier, yet LCR fell "
-            f"{(base['lcr'] - final['lcr']) * 100:.0f} points. Lending the new money cost "
+            f"**Deposits grew and the balance sheet looks healthier, yet LCR fell "
+            f"{(base['lcr'] - final['lcr']) * 100:.0f} points.** Lending the new money cost "
             f"{-drivers_only.set_index('driver').loc['loans', 'd lcr'] * 100:.0f} points on its own. The new deposits "
             f"themselves added almost nothing, because financial institution money carries a 100% runoff weight: "
             f"a dollar in is a dollar of HQLA and a dollar of outflow. Had the same deposits been held as cash, "
             f"LCR would be {pct(cash['lcr'])} and the survival horizon {cash['survival_days']} days."
         )
-    st.write("**One driver at a time.** Each row applies only that line's change to the opening balance sheet, "
-             "lets reserves absorb the cash consequence, and recomputes. Pieces do not add exactly because the "
-             "metrics are ratios; the leftover is shown as interaction.")
     view = t.copy()
     view["change (USD m)"] = view["change"].map(lambda v: f"{v:+,.0f}" if v else "")
     view["LCR (pts)"] = (view["d lcr"] * 100).map(lambda v: f"{v:+.1f}")
     view["NSFR (pts)"] = (view["d nsfr"] * 100).map(lambda v: f"{v:+.1f}")
     table(view[["driver", "change (USD m)", "LCR (pts)", "NSFR (pts)"]], wide=("driver",))
-    hist_view = hist[["deposits", "loans", "hqla"]].rename(columns={"hqla": "HQLA"})
-    long = hist_view.rename_axis("date").reset_index().melt("date", var_name="line", value_name="USD m")
-    base_chart = alt.Chart(long).mark_line().encode(
-        x=alt.X("date:T", title=None), y=alt.Y("USD m:Q", title="USD m", scale=alt.Scale(zero=False)),
-        color=alt.Color("line:N", title=None), tooltip=["date:T", "line:N", alt.Tooltip("USD m:Q", format=",.0f")])
-    shade = alt.Chart(pd.DataFrame({"start": [a], "end": [b]})).mark_rect(opacity=0.12, color="#d9480f").encode(
-        x="start:T", x2="end:T")
-    chart(alt.layer(shade, base_chart).properties(height=280))
-    st.caption("Deposits, loans and HQLA over the full history; the selected window is shaded. The spring 2025 "
-               "event and the Q2 2026 program are both visible as steps.")
+    st.caption("One driver at a time: each row applies only that line's change to the opening balance sheet, "
+               "lets reserves absorb the cash consequence, and recomputes. Pieces do not add exactly because "
+               "the metrics are ratios; the leftover is shown as interaction.")
 
 with tab2:
-    st.write("Trigger means talk about it; limit means escalate. The regulatory minimum is not the limit: the "
-             "internal limit sits above it so the firm never meets the regulator at the floor.")
     status_view = limits.table(snap)
     status_view["status"] = status_view["status"].str.upper()
     table(status_view, wide=("indicator",))
-    lcr_limit = limits.LIMITS["lcr"]
-    surv_limit = limits.LIMITS["survival_days"]
-    left, right = st.columns(2)
-    with left:
-        lv = hist[["lcr"]].rename_axis("date").reset_index()
-        lv["lcr"] = lv["lcr"] * 100
-        line = alt.Chart(lv).mark_line(color="#0f2740").encode(
-            x=alt.X("date:T", title=None), y=alt.Y("lcr:Q", title="LCR %", scale=alt.Scale(zero=False)),
-            tooltip=["date:T", alt.Tooltip("lcr:Q", format=".1f")])
-        rules = alt.Chart(pd.DataFrame({"y": [lcr_limit[1] * 100, lcr_limit[2] * 100, 100.0],
-                                        "kind": ["trigger", "limit", "regulatory minimum"]})).mark_rule(
-            strokeDash=[4, 4]).encode(y="y:Q", color=alt.Color("kind:N", title=None))
-        chart(alt.layer(line, rules).properties(height=260, title="LCR against trigger and limit"))
-    with right:
-        sv = hist[["survival_days"]].rename_axis("date").reset_index()
-        line = alt.Chart(sv).mark_line(color="#0d7c7a").encode(
-            x=alt.X("date:T", title=None), y=alt.Y("survival_days:Q", title="days (91 = beyond the 90 day horizon)"),
-            tooltip=["date:T", "survival_days:Q"])
-        rules = alt.Chart(pd.DataFrame({"y": [surv_limit[1], surv_limit[2]], "kind": ["trigger", "limit"]})).mark_rule(
-            strokeDash=[4, 4]).encode(y="y:Q", color=alt.Color("kind:N", title=None))
-        chart(alt.layer(line, rules).properties(height=260, title="Survival horizon under the internal combined stress"))
-    st.write("**Notice the spring 2025 event.** LCR barely dipped while the survival horizon fell from beyond 90 days to its trigger, "
-             "because the fastest money to leave carries a 100% weight: every dollar of it that goes takes a dollar "
-             "of HQLA and a dollar of assumed outflow with it, so the ratio hardly moves while the cash does. The "
-             "ratio is a snapshot; the horizon is a cash flow. A second line watches both.")
-    st.write("**Breach log.** Every run of red status in the history.")
     log = limits.breach_log(hist)
-    table(log, wide=("indicator",))
+    open_runs = log[log["status"] == "still in breach"]
+    if len(open_runs):
+        st.caption("Trigger means talk about it; limit means escalate; the internal limit sits above the regulatory "
+                   "minimum on purpose. Open breaches: "
+                   + "; ".join(f"{r['indicator']} since {r['from']} (worst {r['worst']})" for _, r in open_runs.iterrows())
+                   + ".")
+    surv_limit = limits.LIMITS["survival_days"]
+    sv = hist[["survival_days"]].rename_axis("date").reset_index()
+    line = alt.Chart(sv).mark_line(color="#0d7c7a").encode(
+        x=alt.X("date:T", title=None), y=alt.Y("survival_days:Q", title="days (91 = beyond the 90 day horizon)"),
+        tooltip=["date:T", "survival_days:Q"])
+    rules = alt.Chart(pd.DataFrame({"y": [surv_limit[1], surv_limit[2]], "kind": ["trigger", "limit"]})).mark_rule(
+        strokeDash=[4, 4]).encode(y="y:Q", color=alt.Color("kind:N", title=None))
+    chart(alt.layer(line, rules).properties(height=260, title="Survival horizon under the internal combined stress"))
+    st.write("**The spring 2025 dip is the point.** LCR barely moved then (a low of about 118% against 132% before) "
+             "while the bank burned a third of its HQLA, because the fastest money to leave carries a 100% weight: "
+             "every dollar of it that goes takes a dollar of HQLA and a dollar of assumed outflow with it, so the "
+             "ratio hardly moves while the cash does. The survival horizon caught it. The ratio is a snapshot; the "
+             "horizon is a cash flow. A second line watches both.")
 
 with tab3:
     l = m.lcr(row)
     n = m.nsfr(row)
     s = m.internal_stress(row)
-    left, mid, right = st.columns(3)
-    with left:
-        st.write("**LCR build**")
-        rows = [("HQLA level 1", l["hqla_detail"]["level1"]), ("HQLA level 2A after haircut", l["hqla_detail"]["level2a"]),
-                ("HQLA level 2B after haircut and cap", l["hqla_detail"]["level2b"]), ("HQLA total", l["hqla"]),
-                ("deposit outflows", sum(l["deposit_outflows"].values())),
-                ("commitment draws", sum(l["draw_outflows"].values())),
-                ("wholesale maturities", l["wholesale_outflow"]), ("total outflows", l["outflows"]),
-                ("inflows (capped at 75% of outflows)", l["inflows"]), ("net outflows", l["net_outflows"])]
-        table(pd.DataFrame(rows, columns=["line", "USD m"]).assign(**{"USD m": lambda d: d["USD m"].map("{:,.0f}".format)}))
-        st.write(f"LCR = {l['hqla']:,.0f} / {l['net_outflows']:,.0f} = **{pct(l['ratio'])}**")
-    with mid:
-        st.write("**NSFR build**")
-        table(pd.DataFrame([("available stable funding", n["asf"]), ("required stable funding", n["rsf"])],
-                           columns=["line", "USD m"]).assign(**{"USD m": lambda d: d["USD m"].map("{:,.0f}".format)}))
-        st.write(f"NSFR = {n['asf']:,.0f} / {n['rsf']:,.0f} = **{pct(n['ratio'])}**")
-        st.write("**Internal combined stress, 30 day view**")
-        table(pd.DataFrame([("counterbalancing capacity", s["cbc"]), ("net outflow by day 30", s["net_30d"])],
-                           columns=["line", "USD m"]).assign(**{"USD m": lambda d: d["USD m"].map("{:,.0f}".format)}))
-        st.write(f"30 day coverage **{pct(s['coverage_30d'])}**, survival horizon **{s['survival_days']} days**")
-    with right:
-        proj = pd.DataFrame({"day": range(1, len(s["cumulative"]) + 1), "cumulative net outflow": s["cumulative"],
-                             "counterbalancing capacity": s["cbc"]})
-        long = proj.melt("day", var_name="line", value_name="USD m")
-        c = alt.Chart(long).mark_line().encode(x=alt.X("day:Q", title="business day of the stress"),
-                                              y=alt.Y("USD m:Q", title="USD m"), color=alt.Color("line:N", title=None),
-                                              tooltip=["day:Q", "line:N", alt.Tooltip("USD m:Q", format=",.0f")])
-        chart(c.properties(height=300, title="Internal stress: cash out versus cash available"))
-        st.caption("Runoff is front loaded (about 70% of the 30 day amount in the first ten days), wholesale "
-                   "does not roll, draws happen inside 30 days, and a slower tail continues to day 90. The horizon "
-                   "is the first day the orange line crosses the blue one.")
-    st.write("**Reconciliation: where the internal scenario and the regulatory weights differ, and what history says.** "
-             "Realized worst is the largest 30 business day outflow (or draw) the segment actually produced; "
-             "the model reading is the chosen model's largest prediction on that segment's own stress days.")
+    st.write(f"LCR = HQLA {l['hqla']:,.0f} / net 30 day outflows {l['net_outflows']:,.0f} = **{pct(l['ratio'])}**. "
+             f"NSFR = available {n['asf']:,.0f} / required {n['rsf']:,.0f} = **{pct(n['ratio'])}**. "
+             f"Internal combined stress: counterbalancing capacity {s['cbc']:,.0f} against {s['net_30d']:,.0f} "
+             f"out by day 30, coverage **{pct(s['coverage_30d'])}**, survival horizon **{s['survival_days']} days**.")
+    proj = pd.DataFrame({"day": range(1, len(s["cumulative"]) + 1), "cumulative net outflow": s["cumulative"],
+                         "counterbalancing capacity": s["cbc"]})
+    long = proj.melt("day", var_name="line", value_name="USD m")
+    c = alt.Chart(long).mark_line().encode(x=alt.X("day:Q", title="business day of the stress"),
+                                          y=alt.Y("USD m:Q", title="USD m"), color=alt.Color("line:N", title=None),
+                                          tooltip=["day:Q", "line:N", alt.Tooltip("USD m:Q", format=",.0f")])
+    chart(c.properties(height=260, title="Internal stress: cash out versus cash available"))
+    st.caption("Runoff is front loaded (about 70% of the 30 day amount in the first ten days), wholesale does not "
+               "roll, draws happen inside 30 days, a slower tail continues to day 90. The horizon is the day the "
+               "lines cross. Weights and sources: docs/assumptions.md.")
     rec = []
     for k in m.DEPOSIT_SEGMENTS:
         realized, when = ml.realized_worst(df, "dep_", k)
@@ -238,56 +198,35 @@ with tab3:
                     "realized worst": f"{pct(realized)} (from {when.date()})", "model reading": pct(reading),
                     "history beat the regulatory weight": "yes" if realized > m.REG_DRAW[k] else "no"})
     rec = pd.DataFrame(rec)
-    table(rec, wide=("item", "realized worst"))
     beaten = rec[rec["history beat the regulatory weight"] == "yes"]["item"].tolist()
-    st.write(f"{len(beaten)} of {len(rec)} lines have already run past their regulatory weight in this history "
-             f"({'; '.join(beaten)}). None has run past its internal assumption. That gap is the reason the "
-             "internal scenario exists, and the reason the challenge in the next tab starts from realized history.")
+    st.write(f"**Reconciliation by segment.** {len(beaten)} of {len(rec)} lines have already run past their "
+             f"regulatory weight in this history ({'; '.join(beaten)}). None has run past its internal assumption. "
+             "That gap is why the internal scenario exists, and why the challenge in the next tab starts from "
+             "realized history.")
+    table(rec, wide=("item", "realized worst"))
 
 with tab4:
     st.write("The first line proposes a change to an internal stress assumption. The second line tests it against "
              "two witnesses, the worst the segment has actually done and the model's reading of its history, puts a "
              "10% buffer on the stronger one, and applies a written rule: below realized history is rejected; at or "
-             "above the floor is accepted; in between is counter-proposed at the floor. The memo is generated from "
-             "the numbers.")
+             "above the floor is accepted; in between is counter-proposed at the floor.")
     table(challenge.summary_table(L["results"]), wide=("assumption", "survival now / proposed / verdict"))
     for r in L["results"]:
-        st.write(f"**{r['id']}, {r['verdict']}.** Submitted rationale: \"{r['rationale']}\"")
-        st.write(r["memo"])
-    st.write("**The model, and what it cannot do.** Four candidates were scored on a time split, trained before 2025 "
-             "and tested on 2025 onward, which contains the confidence event. Read the last two columns: on the days "
-             "when stress had risen but the money had not yet left, the largest outflow any model called was a small "
-             "fraction of what followed. A model trained on calm history cannot see the first severe event coming, "
-             "and a tree model cannot predict an outflow larger than any it has seen. That is why the model is a "
-             "witness in the challenge and never the assumption.")
+        with st.expander(f"{r['id']}, {r['verdict']}: {r['kind'].replace('_', ' ')} on "
+                         f"{r['name'].replace('_', ' ')}, {pct(r['current'], 0)} to {pct(r['proposed'], 0)}"):
+            st.write(f"Submitted rationale: \"{r['rationale']}\"")
+            st.write(r["memo"])
+    st.write("**The model, and what it cannot do.** Four candidates scored on a time split, trained before 2025 and "
+             "tested on 2025 onward, which contains the confidence event. Read the last two columns: when stress had "
+             "risen but the money had not yet left, the largest outflow any model called was about a fifth of what "
+             "followed. A model trained on calm history cannot see the first severe event coming, and a tree model "
+             "cannot predict an outflow larger than any it has seen. That is why the model is a witness in the "
+             "challenge and never the assumption. The evidence model is gradient boosting, chosen because it reads "
+             "each segment's own worst stress most faithfully; the selection tables and feature importance live in "
+             "the code and tests.")
     bd = L["bench_d"].copy()
     for c in ("mae all days", "mae stress days", "largest call at onset", "largest outflow that followed"):
         bd[c] = bd[c].map(lambda v: pct(v, 1))
     table(bd)
-    st.caption("Deposit outflow, 30 business days ahead, per segment. Persistence predicts the last 30 days' outflow "
-               "again. Mean absolute error in percentage points of balance.")
-    st.write("**The evidence model is chosen by fidelity, not by taste.** Every candidate is refit on the full history "
-             "and asked for its reading of each segment's worst stress; the score is the mean gap to what the segment "
-             "actually did. A linear model gives every segment the same stress slope; a tree model learns that "
-             "insured retail and financial institution money do not run the same way.")
-    left, right = st.columns(2)
-    with left:
-        sd = L["sel_d"].copy()
-        for c in ("mean gap to realized worst", "largest gap"):
-            sd[c] = sd[c].map(lambda v: pct(v, 1))
-        st.write("Deposit outflow model")
-        table(sd)
-    with right:
-        sc = L["sel_c"].copy()
-        for c in ("mean gap to realized worst", "largest gap"):
-            sc[c] = sc[c].map(lambda v: pct(v, 1))
-        st.write("Commitment draw model")
-        table(sc)
-    st.write("**What the deposit model leans on.** Permutation importance on the 2025 onward period: how much error "
-             "rises when one feature is scrambled.")
-    imp = L["importance"].copy()
-    imp["importance"] = imp["importance"].map(lambda v: f"{v:.3f}")
-    table(imp)
-    st.caption("Features: the stress index and its 5 day change and 20 day high; the segment's own trailing 5, 20 "
-               "and 30 day outflow; an insured flag; and the segment identity. Segment identity is used by the model "
-               "but left out of the importance table.")
+    st.caption("Deposit outflow 30 business days ahead, per segment. Persistence predicts the last 30 days' outflow "
+               "again. Errors in percentage points of balance.")
