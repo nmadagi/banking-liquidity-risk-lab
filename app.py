@@ -17,7 +17,7 @@ st.set_page_config(page_title="Banking Liquidity Risk Lab", layout="wide")
 
 # Streamlit hashes a cached function's own source, not what it calls. Bump this
 # string whenever the generator, metrics or models change.
-PIPELINE_VERSION = "2026-09-07-v1"
+PIPELINE_VERSION = "2026-09-07-v2"
 
 SEGMENT_LABEL = {"retail_stable": "retail, stable (insured)", "retail_less_stable": "retail, less stable (insured)",
                  "small_business": "small business (insured)", "corp_operational": "corporate operational",
@@ -26,11 +26,13 @@ SEGMENT_LABEL = {"retail_stable": "retail, stable (insured)", "retail_less_stabl
                  "corp_liquidity": "corporate liquidity facilities", "fi_facilities": "financial institution facilities"}
 
 
-def table(df):
+def table(df, wide=()):
+    """Full width dataframe; `wide` names text columns that must not be squeezed."""
+    config = {c: st.column_config.Column(width="large") for c in wide if c in df.columns}
     try:
-        st.dataframe(df, width="stretch", hide_index=True)
+        st.dataframe(df, width="stretch", hide_index=True, column_config=config)
     except Exception:
-        st.dataframe(df, use_container_width=True, hide_index=True)
+        st.dataframe(df, use_container_width=True, hide_index=True, column_config=config)
 
 
 def chart(c):
@@ -135,7 +137,7 @@ with tab1:
     view["change (USD m)"] = view["change"].map(lambda v: f"{v:+,.0f}" if v else "")
     view["LCR (pts)"] = (view["d lcr"] * 100).map(lambda v: f"{v:+.1f}")
     view["NSFR (pts)"] = (view["d nsfr"] * 100).map(lambda v: f"{v:+.1f}")
-    table(view[["driver", "change (USD m)", "LCR (pts)", "NSFR (pts)"]])
+    table(view[["driver", "change (USD m)", "LCR (pts)", "NSFR (pts)"]], wide=("driver",))
     hist_view = hist[["deposits", "loans", "hqla"]].rename(columns={"hqla": "HQLA"})
     long = hist_view.rename_axis("date").reset_index().melt("date", var_name="line", value_name="USD m")
     base_chart = alt.Chart(long).mark_line().encode(
@@ -152,7 +154,7 @@ with tab2:
              "internal limit sits above it so the firm never meets the regulator at the floor.")
     status_view = limits.table(snap)
     status_view["status"] = status_view["status"].str.upper()
-    table(status_view)
+    table(status_view, wide=("indicator",))
     lcr_limit = limits.LIMITS["lcr"]
     surv_limit = limits.LIMITS["survival_days"]
     left, right = st.columns(2)
@@ -180,7 +182,7 @@ with tab2:
              "ratio is a snapshot; the horizon is a cash flow. A second line watches both.")
     st.write("**Breach log.** Every run of red status in the history.")
     log = limits.breach_log(hist)
-    table(log)
+    table(log, wide=("indicator",))
 
 with tab3:
     l = m.lcr(row)
@@ -236,7 +238,7 @@ with tab3:
                     "realized worst": f"{pct(realized)} (from {when.date()})", "model reading": pct(reading),
                     "history beat the regulatory weight": "yes" if realized > m.REG_DRAW[k] else "no"})
     rec = pd.DataFrame(rec)
-    table(rec)
+    table(rec, wide=("item", "realized worst"))
     beaten = rec[rec["history beat the regulatory weight"] == "yes"]["item"].tolist()
     st.write(f"{len(beaten)} of {len(rec)} lines have already run past their regulatory weight in this history "
              f"({'; '.join(beaten)}). None has run past its internal assumption. That gap is the reason the "
@@ -248,7 +250,7 @@ with tab4:
              "10% buffer on the stronger one, and applies a written rule: below realized history is rejected; at or "
              "above the floor is accepted; in between is counter-proposed at the floor. The memo is generated from "
              "the numbers.")
-    table(challenge.summary_table(L["results"]))
+    table(challenge.summary_table(L["results"]), wide=("assumption", "survival now / proposed / verdict"))
     for r in L["results"]:
         st.write(f"**{r['id']}, {r['verdict']}.** Submitted rationale: \"{r['rationale']}\"")
         st.write(r["memo"])
