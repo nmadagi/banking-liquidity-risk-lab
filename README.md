@@ -17,7 +17,7 @@ All data is synthetic and seeded. No real institution, no real clients.
 
 In the second quarter of 2026 the bank runs an institutional cash program.
 Deposits grow 3.3bn, loans grow 3.0bn, the balance sheet looks healthier,
-and the LCR falls thirteen points through the internal limit. Lending the new
+and the LCR falls twelve points through the internal limit. Lending the new
 money is most of it. The new deposits themselves add almost nothing, because
 financial institution money carries a 100% runoff weight: a dollar in is a
 dollar of HQLA and a dollar of assumed outflow. Had the same deposits been

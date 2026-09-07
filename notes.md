@@ -28,7 +28,7 @@ During the spring 2025 event the LCR barely moved while the bank burned a third 
 
 ## the growth program is the headline
 
-Deposits grew, loans grew, the balance sheet looked healthier, and LCR fell thirteen points through the internal limit. Lending the new money is most of it; the new deposits themselves added almost nothing because they were 100% runoff money. The "held as cash" counterfactual is one line of code and it is the whole argument a second line would make to the business.
+Deposits grew, loans grew, the balance sheet looked healthier, and LCR fell twelve points through the internal limit. Lending the new money is most of it; the new deposits themselves added almost nothing because they were 100% runoff money. The "held as cash" counterfactual is one line of code and it is the whole argument a second line would make to the business.
 
 ## model selection, and what I changed my mind about
 
