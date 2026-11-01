@@ -50,6 +50,62 @@ linear model gives every segment the same stress slope.
 
 ## What it covers
 
+How the modules fit together (each box is one file):
+
+```mermaid
+flowchart TD
+
+subgraph group_workflow["App and book"]
+  node_app["Streamlit app<br/>[app.py]"]
+  node_book["Synthetic book generator<br/>[generate.py]"]
+  node_export["CSV export<br/>[export.py]"]
+end
+
+subgraph group_analysis["Liquidity analysis"]
+  node_metrics["Liquidity metrics<br/>[metrics.py]"]
+  node_attribution["Balance sheet attribution<br/>[attribution.py]"]
+  node_limits["Limits and breaches<br/>[limits.py]"]
+end
+
+subgraph group_challenge["Evidence and challenge"]
+  node_ml["Outflow models<br/>[ml.py]"]
+  node_challenge_eval["Assumption challenge<br/>[challenge.py]"]
+end
+
+subgraph group_presentation["Reporting"]
+  node_narrative["Management narrative<br/>[narrative.py]"]
+end
+
+node_user(("Risk analyst"))
+node_anthropic{{"Anthropic API"}}
+
+node_user -->|"views"| node_app
+node_app -->|"generates book"| node_book
+node_app -->|"computes measures"| node_metrics
+node_app -->|"attributes changes"| node_attribution
+node_app -->|"checks limits"| node_limits
+node_app -->|"benchmarks models"| node_ml
+node_app -->|"evaluates proposals"| node_challenge_eval
+node_app -->|"builds summary"| node_narrative
+node_attribution -->|"recomputes snapshots"| node_metrics
+node_challenge_eval -->|"reads evidence"| node_ml
+node_challenge_eval -->|"checks status"| node_limits
+node_challenge_eval -->|"tests stress"| node_metrics
+node_export -->|"exports data"| node_book
+node_narrative -.->|"requests phrasing"| node_anthropic
+
+classDef toneBlue fill:#dbeafe,stroke:#2563eb,stroke-width:1.5px,color:#172554
+classDef toneAmber fill:#fef3c7,stroke:#d97706,stroke-width:1.5px,color:#78350f
+classDef toneMint fill:#dcfce7,stroke:#16a34a,stroke-width:1.5px,color:#14532d
+classDef toneRose fill:#ffe4e6,stroke:#e11d48,stroke-width:1.5px,color:#881337
+classDef toneIndigo fill:#e0e7ff,stroke:#4f46e5,stroke-width:1.5px,color:#312e81
+class node_app,node_book,node_export toneBlue
+class node_metrics,node_attribution,node_limits toneAmber
+class node_ml,node_challenge_eval,node_anthropic toneMint
+class node_narrative toneRose
+class node_user toneIndigo
+```
+
 | Responsibility | Where |
 |---|---|
 | Identify and monitor liquidity risk on deposits, loans and undrawn commitments | data/generate.py, src/metrics.py, tab 1 |
